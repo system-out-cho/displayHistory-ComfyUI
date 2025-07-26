@@ -1,1 +1,1 @@
-"""Unit test package for secondcomfynode."""
+"""Unit test package for displayHistory_ComfyUI."""

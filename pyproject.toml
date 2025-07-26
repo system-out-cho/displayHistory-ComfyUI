@@ -3,9 +3,9 @@ requires = ["setuptools>=70.0"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "secondcomfynode"
+name = "displayHistory_ComfyUI"
 version = "0.0.1"
-description = "keeps history for parameters of a node"
+description = "A node that displays any node's history"
 authors = [
   {name = "Yuchan Cho", email = "yuchan722cho@gmail.com"}
 ]
@@ -29,13 +29,13 @@ dev = [
 ]
 
 [project.urls]
-bugs = "https://github.com/system-out-cho/secondcomfynode/issues"
-homepage = "https://github.com/system-out-cho/secondcomfynode"
+bugs = "https://github.com/system-out-cho/displayHistory_ComfyUI/issues"
+homepage = "https://github.com/system-out-cho/displayHistory_ComfyUI"
 
 
 [tool.comfy]
 PublisherId = "system-out-cho"
-DisplayName = "history-keep-comfyui"
+DisplayName = "displayHistory"
 Icon = ""
 
 

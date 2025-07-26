@@ -19,7 +19,6 @@ let selected_node_ID;
 // 3. only one instance of DisplayHistory is going to work because bad code lol 
 // 4. Reloading node screws a lot stuff up 
 // 5. clean up the messageHandling stuff 
-// 6. if you run different workflow it screws stuff up 
 
 
 // Features later:
