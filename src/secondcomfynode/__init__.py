@@ -1,2 +1,0 @@
-WEB_DIRECTORY = "./web/js"
-__all__ = ['NODE_CLASS_MAPPINGS', 'WEB_DIRECTORY']

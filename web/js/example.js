@@ -17,9 +17,13 @@ let selected_node_ID;
 // 1. node name changing fucks stuff up
 // 2. if node gets deleted it should be removed from display list 
 // 3. only one instance of DisplayHistory is going to work because bad code lol 
-// 4. Reloading node screws a lot stuff up 
+// 4. Reloading node screws a lot stuff up (try to overwrite when nodes are reloaded?)
 // 5. clean up the messageHandling stuff 
+// 6. running another workflow grabs the nodes from that workflow too
 
+//note: if i updated the input name list (all node names) when graph is run
+// that could fix the reload issue temporarily, but the user would just have to
+// run the graph again or refresh page
 
 // Features later:
 // take a certain iteration and put the settings back into the wanted node 
@@ -46,6 +50,7 @@ app.registerExtension({
     },
     async nodeCreated(node) {
         // console.log(node);
+        console.log("does this run when i press r?");
         makeNodeStuff(node);
     }
 })
@@ -61,13 +66,16 @@ const intervalId = setInterval(() => {
         //only grabbing first instance of DisplayHistory, make it change all of them later (make a func for this)
         //shouldnt be index based or title based bc of multiple Display Histories
         //attatch listeners once
-        let the_node = nodeGraph.findNodesByTitle("Display History");
+        let the_node = nodeGraph.findNodesByType("DisplayHistory");
         let widgets = the_node[0].widgets; 
         the_widget = widgets[1];
         the_widget.inputEl.readOnly = true;
         the_widget.inputEl.placeholder = "I hope this is working";
 
-        //populate list 
+        //populate list
+        
+        //get list of all display node histories and make them this 
+        //prob make a function to be able to change their lists dynamically
         let search_widget = widgets[0];
         search_widget.options.values = node_name_list;
 
@@ -77,11 +85,15 @@ const intervalId = setInterval(() => {
     }
 }, 100);
 
+function allDisplayHistoryNodes() {
+    let dhNodes = nodeGraph.findNodesByType("DisplayHistory");
+}
+
 //gets the selected node, puts it in the widget's placeholder and returns it
 function getSelected(widget) {
     let selected;
     const originalCallback = widget.callback;
-    widget.callback = function() {
+    widget.callback = function(value, graphCanvas, node) {
         console.log("selected:", this.value);
         selected = this.value;
         let string = selected.match(/\d+/);
@@ -90,19 +102,25 @@ function getSelected(widget) {
         if (originalCallback) {
             originalCallback.apply(widget, arguments);
         }
-        changeWidgetLabel(node_ID);
+        //the node_ID is the selected node's ID 
+        // the node is the parent node (which DisplayHistory node is it)
+        changeWidgetLabel(node_ID, node);
     }
     return selected;
 }
 
-function changeWidgetLabel(node_ID) {
+function changeWidgetLabel(node_ID, displayNode) {
+    // console.log(displayNode);
+    let widgets = displayNode.widgets;
+    let text_widget = widgets[1];
+
     let paramaters = updated_Map.get(node_ID)["params"];
-    the_widget.inputEl.placeholder = pretty_print(paramaters);
+    text_widget.inputEl.placeholder = pretty_print(paramaters);
 }
 
 function pretty_print(parameters) {
     let string_output = "";
-    console.log(parameters);
+    // console.log(parameters);
 
     for (const key in parameters) {
         let label = key;
