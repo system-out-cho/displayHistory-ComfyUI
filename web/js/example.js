@@ -49,12 +49,28 @@ app.registerExtension({
         initNodeStuff();
     },
     async nodeCreated(node) {
-        // console.log(node);
-        console.log("does this run when i press r?");
         makeNodeStuff(node);
-    }
+    },
+    //this had valid id for every node (doesnt run when new node is made)
+    //but thats fine cause not like i update list till after it runs anyway
+    //maybe ill change it to use this instead of nodeCreated() but later
+    async loadedGraphNode(node) {
+    },
+    //this runs every time nodes are loaded/reloaded 
+    async beforeRegisterNodeDef(nodeType, nodeData, app) {
+        if (nodeType.comfyClass == "DisplayHistory") {
+            //not first time running
+            if (node_name_list) {
+                nodeData.input.required.node[0] = node_name_list;
+            }
+        }
+    },
+
+
 })
 
+//change this so that it actually checks when it's loaded instead of doing whatever the
+//hell this is 
 const intervalId = setInterval(() => {
     if (app.graph._nodes.length > 0) {
         nodeGraph = app.graph;
@@ -84,6 +100,8 @@ const intervalId = setInterval(() => {
         clearInterval(intervalId); // stop checking
     }
 }, 100);
+
+
 
 function allDisplayHistoryNodes() {
     let dhNodes = nodeGraph.findNodesByType("DisplayHistory");
