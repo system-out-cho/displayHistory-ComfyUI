@@ -58,9 +58,12 @@ app.registerExtension({
     },
     //this runs every time nodes are loaded/reloaded 
     async beforeRegisterNodeDef(nodeType, nodeData, app) {
+        console.log(nodeData);
         if (nodeType.comfyClass == "DisplayHistory") {
+            console.log("if conditional running");
             //not first time running
             if (node_name_list) {
+                //input list
                 nodeData.input.required.node[0] = node_name_list;
             }
         }
