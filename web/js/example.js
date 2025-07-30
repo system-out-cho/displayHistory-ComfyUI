@@ -13,22 +13,26 @@ let node_name_list;
 
 let selected_node_ID;
 
+let graph_map;
+let current_graph_ID;
+
 // TODO: 
-// 1. node name changing fucks stuff up
+// 1. node name changing fucks stuff up (maybe add logic so that it's like if duplicate names, append IDs to their display names)
 // 2. if node gets deleted it should be removed from display list 
 // 3. only one instance of DisplayHistory is going to work because bad code lol 
-// 4. Reloading node screws a lot stuff up (try to overwrite when nodes are reloaded?)
+// 4. Reloading node screws a lot stuff up (try to overwrite when nodes are reloaded?) //DONE 
 // 5. clean up the messageHandling stuff 
 // 6. running another workflow grabs the nodes from that workflow too
-
-//note: if i updated the input name list (all node names) when graph is run
-// that could fix the reload issue temporarily, but the user would just have to
-// run the graph again or refresh page
 
 // Features later:
 // take a certain iteration and put the settings back into the wanted node 
 // be able to right click on node and see its ID 
 // 
+
+
+
+// PRIORITY (workflow grabbing stuff)
+// each graph has their own node_obj_map and updated_Map to get history of 
 
 app.registerExtension({
 	name: "example.DisplayMessage",
@@ -58,9 +62,9 @@ app.registerExtension({
     },
     //this runs every time nodes are loaded/reloaded 
     async beforeRegisterNodeDef(nodeType, nodeData, app) {
-        console.log(nodeData);
+        // console.log(nodeData);
         if (nodeType.comfyClass == "DisplayHistory") {
-            console.log("if conditional running");
+            console.log(app);
             //not first time running
             if (node_name_list) {
                 //input list
@@ -74,10 +78,14 @@ app.registerExtension({
 
 //change this so that it actually checks when it's loaded instead of doing whatever the
 //hell this is 
+
+
 const intervalId = setInterval(() => {
     if (app.graph._nodes.length > 0) {
         nodeGraph = app.graph;
         nodesList = app.graph._nodes;
+        current_graph_ID = app.graph.id;
+        // console.log(nodeGraph);
         
         
         // console.log(node_obj_map);
@@ -98,6 +106,7 @@ const intervalId = setInterval(() => {
         let search_widget = widgets[0];
         search_widget.options.values = node_name_list;
 
+        setCurrentGraph();
         getSelected(search_widget);
 
         clearInterval(intervalId); // stop checking
@@ -108,6 +117,15 @@ const intervalId = setInterval(() => {
 
 function allDisplayHistoryNodes() {
     let dhNodes = nodeGraph.findNodesByType("DisplayHistory");
+}
+
+function setCurrentGraph() {
+    const originalLoadGraphData = app.loadGraphData;
+    app.loadGraphData = async function (graphData, ...args) {
+        console.log("switched to", app.graph.id);
+        current_graph_ID = app.graph.id;
+        return await originalLoadGraphData.call(this, graphData, ...args);
+    }
 }
 
 //gets the selected node, puts it in the widget's placeholder and returns it
@@ -161,6 +179,7 @@ function onNodeRemove() {
 }
 
 function initNodeStuff() {
+    graph_map = new Map();
     node_obj_map = new Map();
     node_name_list = [];
     updated_Map = new Map();
