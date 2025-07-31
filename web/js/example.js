@@ -2,7 +2,6 @@ import { app } from "../../../scripts/app.js";
 import {api} from "../../../scripts/api.js";
 
 let nodeGraph;
-let nodesList;
 
 let the_widget;
 
@@ -11,31 +10,70 @@ let updated_Map;
 
 let node_name_list;
 
+//ID of the selected node 
 let selected_node_ID;
 
-let graph_map;
-let current_graph_ID;
+//ID of displayHistoryNode that is currently being selected 
+let current_dN_ID
+
 
 // TODO: 
 // 1. node name changing fucks stuff up (maybe add logic so that it's like if duplicate names, append IDs to their display names)
-// 2. if node gets deleted it should be removed from display list 
-// 3. only one instance of DisplayHistory is going to work because bad code lol 
-// 4. Reloading node screws a lot stuff up (try to overwrite when nodes are reloaded?) //DONE 
+// 2. if node gets deleted it should be removed from display list // DONE
+// 3. only one instance of DisplayHistory is going to work because bad code lol // FIXED
+// 4. Reloading node screws a lot stuff up (try to overwrite when nodes are reloaded?) // FIXED 
 // 5. clean up the messageHandling stuff 
-// 6. running another workflow grabs the nodes from that workflow too
+// 6. running another workflow grabs the nodes from that workflow too // FIXED
 
 // Features later:
 // take a certain iteration and put the settings back into the wanted node 
 // be able to right click on node and see its ID 
-// 
 
-
-
-// PRIORITY (workflow grabbing stuff)
-// each graph has their own node_obj_map and updated_Map to get history of 
+// some notes:
+// when new nodes are made or copied and pasted their initial selection cannot have its parameted listed because the changeWidgetLable function takes in the node's id 
+// and the node's id has not been made yet in nodeCreated()
 
 app.registerExtension({
 	name: "example.DisplayMessage",
+    //this runs every time nodes are loaded/reloaded 
+    async beforeRegisterNodeDef(nodeType, nodeData, app) {
+        if (nodeType.comfyClass == "DisplayHistory") {
+            if (node_name_list) {
+                //input list
+                nodeData.input.required.node[0] = node_name_list;
+            }
+        }
+    },
+
+    async beforeConfigureGraph() {
+        initNodeStuff();
+    },
+
+    async nodeCreated(node) {
+        makeNodeStuff(node);
+        console.log("node created from nodeCreate");
+
+        if (node.title == "Display History" && node_name_list) {
+            assignListToWidget(node);
+        }
+
+        //hook the remove & name change logic onto every node 
+        onNodeRemove(node);
+        console.log(node);
+        onNameChange(node);
+    },
+
+    // This runs when workflws are loaded & when reloaded 
+    async afterConfigureGraph() {
+        console.log("after configure graph", app.graph.id);
+        nodeGraph = app.graph;
+        updateNodeIDs();
+        setupDNodes();
+        updateNodeStuff();
+
+        console.log(nodeGraph);
+    },
+
     async setup() {
 
         function messageHandler(event) { 
@@ -49,137 +87,12 @@ app.registerExtension({
             updateNodeStuff();
         }
         api.addEventListener("execution_success", on_execution_success);
-        
-        initNodeStuff();
-    },
-    async nodeCreated(node) {
-        makeNodeStuff(node);
-    },
-    //this had valid id for every node (doesnt run when new node is made)
-    //but thats fine cause not like i update list till after it runs anyway
-    //maybe ill change it to use this instead of nodeCreated() but later
-    async loadedGraphNode(node) {
-    },
-    //this runs every time nodes are loaded/reloaded 
-    async beforeRegisterNodeDef(nodeType, nodeData, app) {
-        // console.log(nodeData);
-        if (nodeType.comfyClass == "DisplayHistory") {
-            console.log(app);
-            //not first time running
-            if (node_name_list) {
-                //input list
-                nodeData.input.required.node[0] = node_name_list;
-            }
-        }
     },
 
 
 })
 
-//change this so that it actually checks when it's loaded instead of doing whatever the
-//hell this is 
-
-
-const intervalId = setInterval(() => {
-    if (app.graph._nodes.length > 0) {
-        nodeGraph = app.graph;
-        nodesList = app.graph._nodes;
-        current_graph_ID = app.graph.id;
-        // console.log(nodeGraph);
-        
-        
-        // console.log(node_obj_map);
-        
-        //only grabbing first instance of DisplayHistory, make it change all of them later (make a func for this)
-        //shouldnt be index based or title based bc of multiple Display Histories
-        //attatch listeners once
-        let the_node = nodeGraph.findNodesByType("DisplayHistory");
-        let widgets = the_node[0].widgets; 
-        the_widget = widgets[1];
-        the_widget.inputEl.readOnly = true;
-        the_widget.inputEl.placeholder = "I hope this is working";
-
-        //populate list
-        
-        //get list of all display node histories and make them this 
-        //prob make a function to be able to change their lists dynamically
-        let search_widget = widgets[0];
-        search_widget.options.values = node_name_list;
-
-        setCurrentGraph();
-        getSelected(search_widget);
-
-        clearInterval(intervalId); // stop checking
-    }
-}, 100);
-
-
-
-function allDisplayHistoryNodes() {
-    let dhNodes = nodeGraph.findNodesByType("DisplayHistory");
-}
-
-function setCurrentGraph() {
-    const originalLoadGraphData = app.loadGraphData;
-    app.loadGraphData = async function (graphData, ...args) {
-        console.log("switched to", app.graph.id);
-        current_graph_ID = app.graph.id;
-        return await originalLoadGraphData.call(this, graphData, ...args);
-    }
-}
-
-//gets the selected node, puts it in the widget's placeholder and returns it
-function getSelected(widget) {
-    let selected;
-    const originalCallback = widget.callback;
-    widget.callback = function(value, graphCanvas, node) {
-        console.log("selected:", this.value);
-        selected = this.value;
-        let string = selected.match(/\d+/);
-        let node_ID = string ? parseInt(string[0]) : NaN;
-        selected_node_ID = node_ID;
-        if (originalCallback) {
-            originalCallback.apply(widget, arguments);
-        }
-        //the node_ID is the selected node's ID 
-        // the node is the parent node (which DisplayHistory node is it)
-        changeWidgetLabel(node_ID, node);
-    }
-    return selected;
-}
-
-function changeWidgetLabel(node_ID, displayNode) {
-    // console.log(displayNode);
-    let widgets = displayNode.widgets;
-    let text_widget = widgets[1];
-
-    let paramaters = updated_Map.get(node_ID)["params"];
-    text_widget.inputEl.placeholder = pretty_print(paramaters);
-}
-
-function pretty_print(parameters) {
-    let string_output = "";
-    // console.log(parameters);
-
-    for (const key in parameters) {
-        let label = key;
-        let label_value = parameters[key];
-
-        let reversed_array = label_value.slice().reverse();
-        let string_line = `${label}: ${reversed_array}\n`;
-        string_output += string_line;
-    }
-
-    return string_output;
-}
-
-
-function onNodeRemove() {
-    //seems to be a onRemoved attribute on a node, explore later
-}
-
 function initNodeStuff() {
-    graph_map = new Map();
     node_obj_map = new Map();
     node_name_list = [];
     updated_Map = new Map();
@@ -194,7 +107,6 @@ function makeNodeStuff(node) {
 
     // grab widget label & name for each widget
     let widget_list = node.widgets;
-    // console.log(node.title, widget_list);
 
     if (widget_list) {
         widget_list.forEach(widget => {
@@ -221,10 +133,39 @@ function updateNodeIDs() {
         const ID = node.id;
         if (ID != -1) {
             updated_Map.set(ID, node_obj);
-            node_name_list.push(`${node.title}, ID: ${ID}`);
+            node_name_list.push(encodeLabel(node.title, ID));
         }
     });
     node_obj_map.clear();
+}
+
+/*
+- Function: assigns node_name_list to the search widget (mainly used for freshly spawned displayHistory nodes that didn't exist in the workflow)
+- Params: Display History node obj
+- Returns: none
+*/
+function assignListToWidget(displayHistoryNode) {
+    let widgets = displayHistoryNode.widgets;
+    let search_widget = widgets[0];
+    search_widget.options.values = node_name_list;
+
+    getSelected(search_widget);
+}
+
+function setupDNodes() {
+    let dNodes = nodeGraph.findNodesByType("DisplayHistory");
+    dNodes.forEach(node => {
+        let widgets = getNodeWidgetList(node.id);
+        let txt_widget = widgets[1];
+        txt_widget.inputEl.readOnly = true;
+        
+        let search_widget = widgets[0];
+        search_widget.options.values = node_name_list;
+
+        selected_node_ID = decodeLabel(search_widget.value);
+        changeWidgetLabel(selected_node_ID, node.id);
+
+    })
 }
 
 function updateNodeStuff() {
@@ -235,8 +176,6 @@ function updateNodeStuff() {
         const new_params = {};
 
         let widget_list = getNodeWidgetList(node_ID);
-
-        // console.log(node_ID, widget_list);
 
         widget_list.forEach(widget => {
             let oldWidgetList = old_params[widget.label];
@@ -258,13 +197,110 @@ function updateNodeStuff() {
 
         updated_Map.set(node_ID, node_obj);
 
-        if (selected_node_ID) changeWidgetLabel(selected_node_ID);
+        changeAllWidgetLabels();
     });
+}
+
+
+//gets the selected node, puts it in the widget's placeholder and returns it
+function getSelected(widget) {
+    const originalCallback = widget.callback;
+    widget.callback = function(value, graphCanvas, node) {
+        console.log("selected:", this.value);
+        selected_node_ID = decodeLabel(this.value);
+        current_dN_ID = node.id;
+        if (originalCallback) {
+            originalCallback.apply(widget, arguments);
+        }
+        //the node_ID is the selected node's ID 
+        // the node is the parent node (which DisplayHistory node is it)
+        changeWidgetLabel(selected_node_ID, current_dN_ID);
+    }
+}
+
+function decodeLabel(selected_label) {
+    let string = selected_label.match(/\d+/);
+    let node_ID = string ? parseInt(string[0]) : NaN;
+    return node_ID;
+}
+
+/*
+- Function: updates the text labels w/ updated parameter histories for all display History nodes 
+- Params: none
+- Returns: none
+*/
+function changeAllWidgetLabels() {
+    let dNodes = nodeGraph.findNodesByType("DisplayHistory");
+    dNodes.forEach(node => {
+        let widgets = getNodeWidgetList(node.id);
+
+        let search_widget = widgets[0];
+        let currently_selected_node_label = search_widget.value;
+        let currently_selected_node_id = decodeLabel(currently_selected_node_label);
+
+        changeWidgetLabel(currently_selected_node_id, node.id);
+    })
+}
+
+
+function changeWidgetLabel(node_ID, displayNode_ID) {
+    let widgets = getNodeWidgetList(displayNode_ID);
+    let text_widget = widgets[1];
+
+    let paramaters = updated_Map.get(node_ID)["params"];
+    text_widget.inputEl.placeholder = pretty_print(paramaters);
+}
+
+function pretty_print(parameters) {
+    let string_output = "";
+    // console.log(parameters);
+
+    for (const key in parameters) {
+        let label = key;
+        let label_value = parameters[key];
+
+        let reversed_array = label_value.slice().reverse();
+        let string_line = `${label}: ${reversed_array}\n`;
+        string_output += string_line;
+    }
+
+    return string_output;
+}
+
+
+function onNodeRemove(node) {
+    //seems to be a onRemoved attribute on a node, explore later
+    const originalCallback = node.onRemoved;
+    node.onRemoved = function() {
+        console.log("node removed", node);
+        
+        let label = encodeLabel(node.title, node.id)
+        let list_index = node_name_list.indexOf(label);
+
+        node_name_list.splice(list_index, list_index);
+        updated_Map.delete(node.id);
+
+        console.log(node_name_list);
+
+        if (originalCallback) {
+            originalCallback.apply(arguments);
+        }
+    }
+
+}
+
+function onNameChange(node) {
+    let originalCallback = node.title;
+
 }
 
 function getNodeWidgetList(node_ID) {
     let node = nodeGraph.getNodeById(node_ID);
     return node.widgets;
+}
+
+function encodeLabel(nodeTitle, node_ID) {
+    return `${nodeTitle}, ID: ${node_ID}`
 }
 
 
