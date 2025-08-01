@@ -18,7 +18,7 @@ let current_dN_ID
 
 
 // TODO: 
-// 1. node name changing fucks stuff up (maybe add logic so that it's like if duplicate names, append IDs to their display names)
+// 1. node name changing fucks stuff up (maybe add logic so that it's like if duplicate names, append IDs to their display names) //sort of fixed
 // 2. if node gets deleted it should be removed from display list // DONE
 // 3. only one instance of DisplayHistory is going to work because bad code lol // FIXED
 // 4. Reloading node screws a lot stuff up (try to overwrite when nodes are reloaded?) // FIXED 
@@ -27,17 +27,29 @@ let current_dN_ID
 
 // Features later:
 // take a certain iteration and put the settings back into the wanted node 
-// be able to right click on node and see its ID 
+// be able to right click on node and see its ID or append ID to title 
 
 // some notes:
 // when new nodes are made or copied and pasted their initial selection cannot have its parameted listed because the changeWidgetLable function takes in the node's id 
 // and the node's id has not been made yet in nodeCreated()
+
+// cool idea:
+// feature where if you click on a node then press C you can automatically connect it to the closest node with valid input?
 
 app.registerExtension({
 	name: "example.DisplayMessage",
     //this runs every time nodes are loaded/reloaded 
     async beforeRegisterNodeDef(nodeType, nodeData, app) {
         if (nodeType.comfyClass == "DisplayHistory") {
+            console.log(nodeType.prototype);
+
+            const dblClick = nodeType.prototype.onInputDblClick 
+            nodeType.prototype.onInputDblClick = function() {
+                const r = onInputDblClick?.apply(this, arguments);   
+                console.log("logged double click");
+                return r
+            }
+
             if (node_name_list) {
                 //input list
                 nodeData.input.required.node[0] = node_name_list;
@@ -59,8 +71,6 @@ app.registerExtension({
 
         //hook the remove & name change logic onto every node 
         onNodeRemove(node);
-        console.log(node);
-        onNameChange(node);
     },
 
     // This runs when workflws are loaded & when reloaded 
@@ -70,6 +80,8 @@ app.registerExtension({
         updateNodeIDs();
         setupDNodes();
         updateNodeStuff();
+
+        console.log(app);
 
         console.log(nodeGraph);
     },
@@ -87,6 +99,10 @@ app.registerExtension({
             updateNodeStuff();
         }
         api.addEventListener("execution_success", on_execution_success);
+    },
+
+    async onPropertyChange(node) {
+        console.log(node);
     },
 
 
@@ -165,6 +181,8 @@ function setupDNodes() {
         selected_node_ID = decodeLabel(search_widget.value);
         changeWidgetLabel(selected_node_ID, node.id);
 
+        getSelected(search_widget);
+
     })
 }
 
@@ -197,6 +215,7 @@ function updateNodeStuff() {
 
         updated_Map.set(node_ID, node_obj);
 
+        checkNameChange(node_ID);
         changeAllWidgetLabels();
     });
 }
@@ -289,9 +308,23 @@ function onNodeRemove(node) {
 
 }
 
-function onNameChange(node) {
-    let originalCallback = node.title;
+function checkNameChange(node_ID) {
+    let node_obj = updated_Map.get(node_ID);
+    let old_title = node_obj["name"];
 
+    let node = nodeGraph.getNodeById(node_ID);
+    let current_title = node.title;
+
+    if (current_title != old_title) {
+        let old_label = encodeLabel(old_title, node_ID);
+        let list_index = node_name_list.indexOf(old_label);
+
+        node_name_list.splice(list_index, list_index);
+
+        let new_label = encodeLabel(current_title, node_ID);
+
+        node_name_list.push(new_label);
+    }
 }
 
 function getNodeWidgetList(node_ID) {
