@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "displayHistory_ComfyUI"
-version = "0.0.1"
+version = "1.0.0"
 description = "A node that displays any node's history"
 authors = [
   {name = "Yuchan Cho", email = "yuchan722cho@gmail.com"}
