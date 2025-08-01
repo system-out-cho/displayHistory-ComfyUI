@@ -1,13 +1,16 @@
 import { app } from "../../../scripts/app.js";
 import {api} from "../../../scripts/api.js";
 
+//current nodeGraph (workflow)
 let nodeGraph;
 
-let the_widget;
-
+//temporary map to contain (key: node, value: params)
 let node_obj_map;
+
+//map to contain (key: node_ID, value: params)
 let updated_Map;
 
+//node name list to serve as input list for node 
 let node_name_list;
 
 //ID of the selected node 
@@ -16,21 +19,12 @@ let selected_node_ID;
 //ID of displayHistoryNode that is currently being selected 
 let current_dN_ID
 
-
-// TODO: 
-// 1. node name changing fucks stuff up (maybe add logic so that it's like if duplicate names, append IDs to their display names) //sort of fixed
-// 2. if node gets deleted it should be removed from display list // DONE
-// 3. only one instance of DisplayHistory is going to work because bad code lol // FIXED
-// 4. Reloading node screws a lot stuff up (try to overwrite when nodes are reloaded?) // FIXED 
-// 5. clean up the messageHandling stuff 
-// 6. running another workflow grabs the nodes from that workflow too // FIXED
-
 // Features later:
 // take a certain iteration and put the settings back into the wanted node 
 // be able to right click on node and see its ID or append ID to title 
 
 // some notes:
-// when new nodes are made or copied and pasted their initial selection cannot have its parameted listed because the changeWidgetLable function takes in the node's id 
+// when new nodes are made or copied and pasted their initial selection cannot have its parameted listed immediately because the changeWidgetLable function takes in the node's id 
 // and the node's id has not been made yet in nodeCreated()
 
 // cool idea:
@@ -59,7 +53,6 @@ app.registerExtension({
             assignListToWidget(node);
         }
 
-        //hook the remove & name change logic onto every node 
         onNodeRemove(node);
     },
 
@@ -73,12 +66,6 @@ app.registerExtension({
     },
 
     async setup() {
-
-        function messageHandler(event) { 
-            the_widget.inputEl.placeholder = event.detail.message;
-        }
-        app.api.addEventListener("DisplayHistory.message", messageHandler);
-
         function on_execution_success() { 
             // console.log("WORKFLOW RAN");
             updateNodeIDs();
@@ -105,12 +92,9 @@ function initNodeStuff() {
 - Returns: None
 */
 function makeNodeStuff(node) {
-    // for each node grab the name, its widget labels and values (parameters), and add it to object list 
-    // define objects
     const params = {};
     const node_obj = {};
 
-    // grab widget label & name for each widget
     let widget_list = node.widgets;
 
     if (widget_list) {
@@ -118,14 +102,10 @@ function makeNodeStuff(node) {
             params[widget.label] = [widget.value];
         })
         
-        //add name and param obj to node_obj and push it to obj list 
-        //need to make this into an actual ID and not the title 
         node_obj["name"] = node.title;
         node_obj["params"] = params;
 
         node_obj_map.set(node, node_obj);
-    
-        //add node name to list of node names
     }
 
 }
@@ -374,24 +354,3 @@ function encodeLabel(nodeTitle, node_ID) {
     return `${nodeTitle}, ID: ${node_ID}`
 }
 
-
-//for sending messages to the backend 
-api.addEventListener("proxy", function proxyHandler (event) {
-    console.log("event", event);
-    const data = event.detail
-    const reply = {
-        node_id: data.id,
-        outputs: {
-        output: node_obj_map.get("KSampler"),
-        nodeNameList: node_name_list,
-        }
-    }
-
-    api.fetchApi("/proxy_reply", {
-    method: "POST",
-    headers: {
-        "Content-Type": "application/json",
-    },
-    body: JSON.stringify(reply),
-    })
-})
