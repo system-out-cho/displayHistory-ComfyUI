@@ -34,7 +34,7 @@ homepage = "https://github.com/system-out-cho/displayHistory_ComfyUI"
 
 
 [tool.comfy]
-PublisherId = "system-out-cho"
+PublisherId = "cho"
 DisplayName = "displayHistory"
 Icon = ""
 
