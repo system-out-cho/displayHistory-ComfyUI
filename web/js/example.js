@@ -41,15 +41,6 @@ app.registerExtension({
     //this runs every time nodes are loaded/reloaded 
     async beforeRegisterNodeDef(nodeType, nodeData, app) {
         if (nodeType.comfyClass == "DisplayHistory") {
-            console.log(nodeType.prototype);
-
-            const dblClick = nodeType.prototype.onInputDblClick 
-            nodeType.prototype.onInputDblClick = function() {
-                const r = onInputDblClick?.apply(this, arguments);   
-                console.log("logged double click");
-                return r
-            }
-
             if (node_name_list) {
                 //input list
                 nodeData.input.required.node[0] = node_name_list;
@@ -63,7 +54,6 @@ app.registerExtension({
 
     async nodeCreated(node) {
         makeNodeStuff(node);
-        console.log("node created from nodeCreate");
 
         if (node.title == "Display History" && node_name_list) {
             assignListToWidget(node);
@@ -75,15 +65,11 @@ app.registerExtension({
 
     // This runs when workflws are loaded & when reloaded 
     async afterConfigureGraph() {
-        console.log("after configure graph", app.graph.id);
+        // console.log("after configure graph", app.graph.id);
         nodeGraph = app.graph;
         updateNodeIDs();
         setupDNodes();
         updateNodeStuff();
-
-        console.log(app);
-
-        console.log(nodeGraph);
     },
 
     async setup() {
@@ -94,27 +80,30 @@ app.registerExtension({
         app.api.addEventListener("DisplayHistory.message", messageHandler);
 
         function on_execution_success() { 
-            console.log("WORKFLOW RAN");
+            // console.log("WORKFLOW RAN");
             updateNodeIDs();
             updateNodeStuff();
         }
         api.addEventListener("execution_success", on_execution_success);
     },
-
-    async onPropertyChange(node) {
-        console.log(node);
-    },
-
-
 })
 
+/*
+- Function: initialize lists & maps to be used 
+- Params: None
+- Returns: None
+*/
 function initNodeStuff() {
     node_obj_map = new Map();
     node_name_list = [];
     updated_Map = new Map();
 }
 
-//initialize node_obj_list
+/*
+- Function: IDs are not made on nodeCreated() so this func makes a temp map of node objects to its parameters (node obj, params) 
+- Params: (obj) node
+- Returns: None
+*/
 function makeNodeStuff(node) {
     // for each node grab the name, its widget labels and values (parameters), and add it to object list 
     // define objects
@@ -140,7 +129,11 @@ function makeNodeStuff(node) {
     }
 
 }
-
+/*
+- Function: This function takes that temp map and updates the keys with the nodes' IDs 
+- Params: None
+- Returns: None
+*/
 function updateNodeIDs() {
     node_obj_map.forEach((value, key) => {
         let node = key;
@@ -157,7 +150,7 @@ function updateNodeIDs() {
 
 /*
 - Function: assigns node_name_list to the search widget (mainly used for freshly spawned displayHistory nodes that didn't exist in the workflow)
-- Params: Display History node obj
+- Params: (obj) node
 - Returns: none
 */
 function assignListToWidget(displayHistoryNode) {
@@ -168,6 +161,11 @@ function assignListToWidget(displayHistoryNode) {
     getSelected(search_widget);
 }
 
+/*
+- Function: This function sets up all the displayHistory nodes by setting their text & search widgets initially 
+- Params: None
+- Returns: None
+*/
 function setupDNodes() {
     let dNodes = nodeGraph.findNodesByType("DisplayHistory");
     dNodes.forEach(node => {
@@ -186,6 +184,11 @@ function setupDNodes() {
     })
 }
 
+/*
+- Function: Main function that records history for each node and appends it to each node's list in the updated_Map, it also checks for name changes 
+- Params: None
+- Returns: None
+*/
 function updateNodeStuff() {
     updated_Map.forEach((value, key) => {
         let node_ID = key;
@@ -221,11 +224,15 @@ function updateNodeStuff() {
 }
 
 
-//gets the selected node, puts it in the widget's placeholder and returns it
+/*
+- Function: Helper function that takes the search widget and overwrites the callback function so that it can take the input of the selected node from user 
+- Params: (obj) widget
+- Returns: None
+*/
 function getSelected(widget) {
     const originalCallback = widget.callback;
     widget.callback = function(value, graphCanvas, node) {
-        console.log("selected:", this.value);
+        // console.log("selected:", this.value);
         selected_node_ID = decodeLabel(this.value);
         current_dN_ID = node.id;
         if (originalCallback) {
@@ -237,6 +244,11 @@ function getSelected(widget) {
     }
 }
 
+/*
+- Function: Helper function that decodes the node labels from node_name_list to just the ID (for ex: "Ksampler, ID: 3" -> "3")
+- Params: None
+- Returns: None
+*/
 function decodeLabel(selected_label) {
     let string = selected_label.match(/\d+/);
     let node_ID = string ? parseInt(string[0]) : NaN;
@@ -245,8 +257,8 @@ function decodeLabel(selected_label) {
 
 /*
 - Function: updates the text labels w/ updated parameter histories for all display History nodes 
-- Params: none
-- Returns: none
+- Params: None
+- Returns: None
 */
 function changeAllWidgetLabels() {
     let dNodes = nodeGraph.findNodesByType("DisplayHistory");
@@ -261,7 +273,11 @@ function changeAllWidgetLabels() {
     })
 }
 
-
+/*
+- Function: updates the text label w/ updated parameter history for a single display History node 
+- Params: (number) node_ID, (number) displayNode_ID
+- Returns: None
+*/
 function changeWidgetLabel(node_ID, displayNode_ID) {
     let widgets = getNodeWidgetList(displayNode_ID);
     let text_widget = widgets[1];
@@ -270,9 +286,13 @@ function changeWidgetLabel(node_ID, displayNode_ID) {
     text_widget.inputEl.placeholder = pretty_print(paramaters);
 }
 
+/*
+- Function: Helper function that takes in the parameters obj from updated_Map and returns a 'pretty printed' string 
+- Params: parameters (obj from updated_Map)
+- Returns: string_output (string)
+*/
 function pretty_print(parameters) {
     let string_output = "";
-    // console.log(parameters);
 
     for (const key in parameters) {
         let label = key;
@@ -287,19 +307,22 @@ function pretty_print(parameters) {
 }
 
 
+/*
+- Function: overwrites the onRemove function so that nodes can be removed dynamically from input list and updated_Map when deleted
+- Params: (obj) node
+- Returns: None
+*/
 function onNodeRemove(node) {
     //seems to be a onRemoved attribute on a node, explore later
     const originalCallback = node.onRemoved;
     node.onRemoved = function() {
-        console.log("node removed", node);
+        // console.log("node removed", node);
         
         let label = encodeLabel(node.title, node.id)
         let list_index = node_name_list.indexOf(label);
 
         node_name_list.splice(list_index, list_index);
         updated_Map.delete(node.id);
-
-        console.log(node_name_list);
 
         if (originalCallback) {
             originalCallback.apply(arguments);
@@ -308,6 +331,11 @@ function onNodeRemove(node) {
 
 }
 
+/*
+- Function: checks if the name has changed for any given node 
+- Params: (number) node_ID
+- Returns: None
+*/
 function checkNameChange(node_ID) {
     let node_obj = updated_Map.get(node_ID);
     let old_title = node_obj["name"];
@@ -327,11 +355,21 @@ function checkNameChange(node_ID) {
     }
 }
 
+/*
+- Function: grabs the widget list for any node 
+- Params: (number) node_ID
+- Returns: (arr) widgets
+*/
 function getNodeWidgetList(node_ID) {
     let node = nodeGraph.getNodeById(node_ID);
     return node.widgets;
 }
 
+/*
+- Function: encodes the label to be pushed to node name list e.g. "KSampler" + "3" -> "KSampler, ID 3"
+- Params: (string) nodeTitle, (number) node_ID
+- Returns: None
+*/
 function encodeLabel(nodeTitle, node_ID) {
     return `${nodeTitle}, ID: ${node_ID}`
 }
